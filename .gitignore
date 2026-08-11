@@ -1,0 +1,7 @@
+# Generated experiment artifacts kept locally
+outputs/
+logs/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
