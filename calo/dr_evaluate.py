@@ -8,6 +8,7 @@ import os
 import numpy as np
 import torch
 
+from .device import select_device
 from .dr_model import DualReadoutHCALNet
 from .dr_train import make_loader
 from .dual_readout import AUX_NAMES, DualReadoutCalibration, DualReadoutGeometry
@@ -46,7 +47,7 @@ def energy_metrics(values, true_energy):
 
 
 def evaluate_one(exp, files, out_dir, max_events_per_file=-1):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = select_device(exp.get("device", "auto"))
     geo = DualReadoutGeometry(**exp["geometry"])
     calibration = DualReadoutCalibration()
     model = DualReadoutHCALNet(aux_dim=len(AUX_NAMES)).to(device)

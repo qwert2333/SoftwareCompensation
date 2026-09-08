@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--num-workers", type=int, default=None)
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto")
     return parser.parse_args()
 
 
@@ -63,6 +64,7 @@ def main():
             exp["batch_size"] = args.batch_size
         if args.num_workers is not None:
             exp["num_workers"] = args.num_workers
+        exp["device"] = args.device
         set_global_seed(seed)
         out_dir = os.path.join(args.output_dir, exp["name"])
         os.makedirs(out_dir, exist_ok=True)

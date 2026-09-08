@@ -30,6 +30,11 @@ conda run -n ml4hep python run_dual_readout.py \
   --batch-size 2 --num-workers 0
 ```
 
+Device selection defaults to `--device auto`, with priority CUDA, MPS, then
+CPU. Use `--device mps` to require Apple GPU execution; the run fails instead
+of silently falling back if MPS is unavailable. Automatic mixed precision and
+gradient scaling remain CUDA-only, while MPS uses FP32.
+
 Run the full comparison by omitting the smoke-test overrides. Outputs are
 written below `outputs_dual_readout/<experiment>/`, including configuration,
 all epoch checkpoints, loss curves, test-event predictions, and per-energy

@@ -1,7 +1,9 @@
 import unittest
 
 import numpy as np
+import torch
 
+from calo.device import select_device
 from calo.dual_readout import (
     CHANNEL_BASE,
     DualReadoutCalibration,
@@ -59,6 +61,9 @@ class DualReadoutInputTest(unittest.TestCase):
         first = split_name(123, 30.0, 170510363)
         self.assertEqual(first, split_name(123, 30.0, 170510363))
         self.assertIn(first, {"train", "val", "test"})
+
+    def test_explicit_cpu_device(self):
+        self.assertEqual(select_device("cpu"), torch.device("cpu"))
 
 
 if __name__ == "__main__":

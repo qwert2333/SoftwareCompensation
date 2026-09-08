@@ -3,6 +3,7 @@
 import json
 import os
 import time
+from contextlib import nullcontext
 
 import matplotlib.pyplot as plt
 import torch
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from .dr_dataset import DualReadoutIterable
 from .dr_model import DualReadoutHCALNet
+from .device import select_device
 from .dual_readout import AUX_NAMES, DualReadoutCalibration, DualReadoutGeometry
 from .losses import compute_loss
 
@@ -45,7 +47,11 @@ def run_epoch(model, loader, optimizer, scaler, device, exp, training):
             target = batch["energy_true"].to(device, non_blocking=True)
             if training:
                 optimizer.zero_grad(set_to_none=True)
-            with torch.autocast(device_type=device.type, enabled=(device.type == "cuda")):
+            amp_context = (
+                torch.autocast(device_type="cuda", enabled=True)
+                if device.type == "cuda" else nullcontext()
+            )
+            with amp_context:
                 prediction = model(voxel, aux)
                 loss = compute_loss(
                     prediction, target,
@@ -77,7 +83,8 @@ def _plot(log, out_dir):
 
 
 def train_one(exp, files, out_dir, seed, max_events_per_file=-1):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = select_device(exp.get("device", "auto"))
+    print(f"Compute device: {device}")
     geo = DualReadoutGeometry(**exp["geometry"])
     calibration = DualReadoutCalibration()
     model = DualReadoutHCALNet(aux_dim=len(AUX_NAMES)).to(device)

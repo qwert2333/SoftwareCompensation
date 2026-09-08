@@ -8,6 +8,7 @@ COMMON = dict(
     lr=1.0e-3,
     batch_size=8,
     num_workers=2,
+    device="auto",
     split_seed=170510363,
     cell_signal_scale_gev=1.0e-3,
 )
