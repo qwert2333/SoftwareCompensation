@@ -1,7 +1,6 @@
 """Controlled first dual-readout comparison."""
 
 COMMON = dict(
-    geometry=dict(nx=60, ny=60, nz=100, crop_nx=30, crop_ny=30),
     loss_name="l1_relative",
     denom_min=0.7,
     epochs=40,

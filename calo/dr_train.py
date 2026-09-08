@@ -86,7 +86,7 @@ def train_one(exp, files, out_dir, seed, max_events_per_file=-1):
     device = select_device(exp.get("device", "auto"))
     print(f"Compute device: {device}")
     geo = DualReadoutGeometry(**exp["geometry"])
-    calibration = DualReadoutCalibration()
+    calibration = DualReadoutCalibration(**exp["calibration"])
     model = DualReadoutHCALNet(aux_dim=len(AUX_NAMES)).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=float(exp.get("lr", 1.0e-3)))
     scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda"))

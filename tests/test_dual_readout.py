@@ -20,18 +20,26 @@ def encoded_cell(channel, ix, iy, iz, base=1000):
 
 class DualReadoutInputTest(unittest.TestCase):
     def setUp(self):
-        self.geo = DualReadoutGeometry()
-        self.calibration = DualReadoutCalibration()
+        self.geo = DualReadoutGeometry(nx=60, ny=60, nz=120)
+        self.calibration = DualReadoutCalibration(
+            s_gev_per_count=0.181099 / 1000.0,
+            c_gev_per_count=0.0382009 / 1000.0,
+            h_s_intercept=0.766375,
+            h_s_slope_per_gev=-0.000985188,
+            h_c_intercept=0.366592,
+            h_c_slope_per_gev=-0.000484105,
+        )
 
     def test_fixed_central_crop_discards_outer_cells(self):
         ids = np.array([
             encoded_cell(1, 15, 15, 0),
             encoded_cell(1, 15, 15, 0),
             encoded_cell(1, 14, 15, 0),
+            encoded_cell(1, 15, 15, 100),
             encoded_cell(2, 15, 15, 0),
         ])
-        n_s = np.array([100, 20, 999, 0])
-        n_c = np.array([0, 0, 0, 50])
+        n_s = np.array([100, 20, 999, 999, 0])
+        n_c = np.array([0, 0, 0, 0, 50])
         voxel, _, diagnostics = build_event_input(
             ids, n_s, n_c, "sc_full", self.geo, self.calibration
         )

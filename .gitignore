@@ -1,5 +1,6 @@
 # Generated experiment artifacts kept locally
 outputs/
+outputs_dual_readout/
 logs/
 
 # Python bytecode

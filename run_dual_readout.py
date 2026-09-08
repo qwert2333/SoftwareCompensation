@@ -13,13 +13,18 @@ from dataclasses import asdict
 from calo.dr_evaluate import evaluate_one
 from calo.dr_experiment_grid import EXPERIMENTS
 from calo.dr_train import train_one
-from calo.dual_readout import AUX_NAMES, DualReadoutCalibration
+from calo.dual_readout import AUX_NAMES, load_baseline_profile
 from calo.seed import set_global_seed
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", required=True)
+    parser.add_argument(
+        "--reference-dir",
+        default=None,
+        help="Directory containing tables/electron_em_calibration.csv and pion_hovere_energy_fit.csv",
+    )
     parser.add_argument("--output-dir", default="outputs_dual_readout")
     parser.add_argument("--experiment", choices=("s_only", "sc_full", "all"), default="all")
     parser.add_argument("--max-events-per-file", type=int, default=-1)
@@ -35,15 +40,11 @@ def main():
     files = sorted(glob.glob(os.path.join(args.input_dir, "*_pi-_*.root")))
     if not files:
         raise RuntimeError(f"No pion ROOT files found in {args.input_dir}")
+    profile = load_baseline_profile(args.input_dir, args.reference_dir)
     expected_energies = {5, 10, 20, 30, 40, 50}
     found_energies = set()
     for path in files:
         name = os.path.basename(path)
-        if "ScintZnWO4_Quartz_AbsSTAINLESS-STEEL_5-5-10mm_N60x60x100" not in name:
-            raise RuntimeError(
-                "The built-in geometry/calibration is only valid for "
-                f"ZnWO4_5_Quartz_5_Steel_10; incompatible file: {name}"
-            )
         match = re.search(r"_pi-_([0-9]+)GeV\.root$", name)
         if match:
             found_energies.add(int(match.group(1)))
@@ -65,16 +66,21 @@ def main():
         if args.num_workers is not None:
             exp["num_workers"] = args.num_workers
         exp["device"] = args.device
+        exp["geometry"] = asdict(profile.geometry)
+        exp["calibration"] = asdict(profile.calibration)
         set_global_seed(seed)
-        out_dir = os.path.join(args.output_dir, exp["name"])
+        baseline_output = os.path.join(args.output_dir, profile.name)
+        out_dir = os.path.join(baseline_output, exp["name"])
         os.makedirs(out_dir, exist_ok=True)
         config = {
             **exp,
             "seed": seed,
             "input_files": files,
+            "baseline": profile.name,
             "aux_names": AUX_NAMES,
-            "calibration": asdict(DualReadoutCalibration()),
-            "crop_policy": "fixed central 30x30 transverse cells; all 100 z layers; outside discarded",
+            "calibration_table": profile.calibration_table,
+            "hovere_fit_table": profile.hovere_fit_table,
+            "crop_policy": "x,y central [15,45); z front [0,100); all outside cells discarded",
             "truth_policy": "MCtruth_energy is target only; no truth or filename energy enters features",
             "standard_dr_policy": "h/e and chi evaluated self-consistently from reconstructed crop S/C",
         }
@@ -84,7 +90,7 @@ def main():
         all_metrics.extend(evaluate_one(exp, files, out_dir, args.max_events_per_file))
 
     if len(selected) == 2:
-        combined_path = os.path.join(args.output_dir, "comparison_metrics.csv")
+        combined_path = os.path.join(baseline_output, "comparison_metrics.csv")
         with open(combined_path, "w", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=list(all_metrics[0]))
             writer.writeheader()
@@ -112,7 +118,7 @@ def main():
                 "s_only_mean_relative_bias": s_row["mean_relative_bias"],
                 "sc_full_mean_relative_bias": sc_row["mean_relative_bias"],
             })
-        with open(os.path.join(args.output_dir, "sc_vs_s_only.csv"), "w", newline="") as handle:
+        with open(os.path.join(baseline_output, "sc_vs_s_only.csv"), "w", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=list(comparison[0]))
             writer.writeheader()
             writer.writerows(comparison)

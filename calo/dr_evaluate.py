@@ -49,7 +49,7 @@ def energy_metrics(values, true_energy):
 def evaluate_one(exp, files, out_dir, max_events_per_file=-1):
     device = select_device(exp.get("device", "auto"))
     geo = DualReadoutGeometry(**exp["geometry"])
-    calibration = DualReadoutCalibration()
+    calibration = DualReadoutCalibration(**exp["calibration"])
     model = DualReadoutHCALNet(aux_dim=len(AUX_NAMES)).to(device)
     checkpoint = torch.load(
         os.path.join(out_dir, "checkpoints", "best.pth"), map_location=device
