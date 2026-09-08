@@ -5,3 +5,6 @@ logs/
 # Python bytecode
 __pycache__/
 *.py[cod]
+
+# macOS Finder metadata
+.DS_Store
