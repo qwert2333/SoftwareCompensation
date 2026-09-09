@@ -27,11 +27,16 @@ the training entry point.
 Run a small interface test:
 
 ```bash
-conda run -n ml4hep python run_dual_readout.py \
+conda run --no-capture-output -n ml4hep python run_dual_readout.py \
   --input-dir /Users/fangyi/WorkingArea/DualReadout_MLSC/Sapphire_5-5-5mm \
   --experiment all --epochs 1 --max-events-per-file 50 \
   --batch-size 2 --num-workers 0
 ```
+
+`--no-capture-output` lets each completed epoch appear in the terminal
+immediately. Each line reports train/validation loss and event counts, the
+best validation loss so far, learning rate, device, elapsed time, and saved
+checkpoint. A `*` after `best_val` marks a new best epoch.
 
 Device selection defaults to `--device auto`, with priority CUDA, MPS, then
 CPU. Use `--device mps` to require Apple GPU execution; the run fails instead

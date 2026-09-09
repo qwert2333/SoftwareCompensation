@@ -84,7 +84,7 @@ def _plot(log, out_dir):
 
 def train_one(exp, files, out_dir, seed, max_events_per_file=-1):
     device = select_device(exp.get("device", "auto"))
-    print(f"Compute device: {device}")
+    print(f"Compute device: {device}", flush=True)
     geo = DualReadoutGeometry(**exp["geometry"])
     calibration = DualReadoutCalibration(**exp["calibration"])
     model = DualReadoutHCALNet(aux_dim=len(AUX_NAMES)).to(device)
@@ -110,7 +110,8 @@ def train_one(exp, files, out_dir, seed, max_events_per_file=-1):
         best = float(checkpoint["best_val"])
         log = checkpoint["log"]
 
-    for epoch in range(start_epoch, int(exp.get("epochs", 40)) + 1):
+    total_epochs = int(exp.get("epochs", 40))
+    for epoch in range(start_epoch, total_epochs + 1):
         started = time.time()
         train_loss, n_train = run_epoch(model, train_loader, optimizer, scaler, device, exp, True)
         val_loss, n_val = run_epoch(model, val_loader, optimizer, scaler, device, exp, False)
@@ -122,16 +123,25 @@ def train_one(exp, files, out_dir, seed, max_events_per_file=-1):
             "epoch": epoch, "best_val": min(best, val_loss), "log": log,
             "exp": exp, "seed": seed, "aux_names": AUX_NAMES,
         }
-        if val_loss < best:
+        improved = val_loss < best
+        if improved:
             best = val_loss
             state["best_val"] = best
             torch.save(state, best_path)
         torch.save(state, last_path)
-        torch.save(state, os.path.join(checkpoint_dir, f"epoch_{epoch:03d}.pth"))
+        epoch_checkpoint = f"epoch_{epoch:03d}.pth"
+        torch.save(state, os.path.join(checkpoint_dir, epoch_checkpoint))
         _plot(log, out_dir)
+        elapsed_minutes = (time.time() - started) / 60.0
+        learning_rate = optimizer.param_groups[0]["lr"]
         print(
-            f"[{epoch:03d}] train={train_loss:.6f} ({n_train}) "
-            f"val={val_loss:.6f} ({n_val}) time={(time.time()-started)/60:.1f} min"
+            f"[epoch {epoch:03d}/{total_epochs:03d}] "
+            f"train_loss={train_loss:.6f} n_train={n_train} "
+            f"val_loss={val_loss:.6f} n_val={n_val} "
+            f"best_val={best:.6f}{'*' if improved else ''} "
+            f"lr={learning_rate:.3e} device={device.type} "
+            f"time={elapsed_minutes:.1f}min checkpoint={epoch_checkpoint}",
+            flush=True,
         )
     with open(os.path.join(out_dir, "loss_log.json"), "w") as handle:
         json.dump(log, handle, indent=2)
