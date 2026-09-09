@@ -1,9 +1,11 @@
 import unittest
 
 import numpy as np
+import pandas as pd
 import torch
 
 from calo.device import select_device
+from calo.dr_performance import fit_resolution_curves
 from calo.dual_readout import (
     CHANNEL_BASE,
     DualReadoutCalibration,
@@ -72,6 +74,29 @@ class DualReadoutInputTest(unittest.TestCase):
 
     def test_explicit_cpu_device(self):
         self.assertEqual(select_device("cpu"), torch.device("cpu"))
+
+
+class DualReadoutPerformanceTest(unittest.TestCase):
+    def test_resolution_fit_recovers_stochastic_and_constant_terms(self):
+        energy = np.array([5.0, 10.0, 20.0, 30.0, 40.0, 50.0])
+        stochastic, constant = 0.30, 0.04
+        resolution = np.sqrt(stochastic**2 / energy + constant**2)
+        points = pd.DataFrame({
+            "comparison": "test",
+            "method": "known_curve",
+            "label": "Known curve",
+            "source_scope": "unit test",
+            "source_kind": "synthetic",
+            "energy_GeV": energy,
+            "resolution_fraction": resolution,
+            "resolution_error_fraction": np.full(energy.size, 0.001),
+        })
+        result = fit_resolution_curves(points).iloc[0]
+        self.assertAlmostEqual(
+            result["stochastic_term_fraction_sqrtGeV"], stochastic, places=7
+        )
+        self.assertAlmostEqual(result["constant_term_fraction"], constant, places=7)
+        self.assertAlmostEqual(result["chi2"], 0.0, places=7)
 
 
 if __name__ == "__main__":

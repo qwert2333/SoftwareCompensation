@@ -51,3 +51,20 @@ and per-energy `sigma68/MPV`, response, and bias metrics.
 With the default `--experiment all`, the top-level output also contains
 `comparison_metrics.csv` and `sc_vs_s_only.csv`. The latter reports the
 per-energy resolution change from enabling all C information.
+
+Build the post-training resolution comparison and the
+`sqrt(a^2/E + b^2)` stochastic/constant-term fits with:
+
+```bash
+conda run --no-capture-output -n ml4hep \
+  python validate_dual_readout_performance.py \
+  --run-dir outputs_dual_readout/Sapphire_5-5-5mm
+```
+
+The S-only plot compares raw cropped S, the cropped S-only CNN, and the
+existing CALICE local-SC application result. The CALICE result is retained as
+an explicitly labelled full-grid external reference; the other curves use the
+common `30x30x100` test split. The dual-readout plot compares the standard DR
+calculation and the S+C CNN on that common cropped test split. Point tables,
+fit parameters, fit quality, plots, and exact source paths are written below
+`performance_validation/`.
