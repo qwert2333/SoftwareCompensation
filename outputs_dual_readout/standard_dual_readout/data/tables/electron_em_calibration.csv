@@ -1,0 +1,13 @@
+structure,channel,branch,energy_GeV,entries,calibration_MeV_per_readout,mean_GeV,mpv_GeV,sigma68_GeV,resolution_percent,resolution_error_percent
+data,S,counter_Scintillation_ScintLayer,5,5000,0.0946402,5.00297,5.04255,0.209013,4.14498,0.0414498
+data,C,counter_Cerenkov_CherenkovLayer,5,5000,0.0381864,5.00539,4.98745,0.142645,2.86009,0.0286009
+data,S,counter_Scintillation_ScintLayer,10,5000,0.0946402,10.0051,9.95902,0.295041,2.96255,0.0296255
+data,C,counter_Cerenkov_CherenkovLayer,10,5000,0.0381864,10.0027,10.0355,0.211209,2.10461,0.0210461
+data,S,counter_Scintillation_ScintLayer,20,5000,0.0946402,20.011,20.0323,0.41547,2.074,0.02074
+data,C,counter_Cerenkov_CherenkovLayer,20,5000,0.0381864,20.0108,19.9573,0.302742,1.51695,0.0151695
+data,S,counter_Scintillation_ScintLayer,30,5000,0.0946402,29.9988,30.1038,0.515694,1.71305,0.0171305
+data,C,counter_Cerenkov_CherenkovLayer,30,5000,0.0381864,30.0065,30.1607,0.364966,1.21007,0.0121007
+data,S,counter_Scintillation_ScintLayer,40,5000,0.0946402,40.0037,39.9326,0.601911,1.50732,0.0150732
+data,C,counter_Cerenkov_CherenkovLayer,40,5000,0.0381864,40.0059,40.1532,0.440919,1.09809,0.0109809
+data,S,counter_Scintillation_ScintLayer,50,5000,0.0946402,49.992,50.2173,0.66816,1.33054,0.0133054
+data,C,counter_Cerenkov_CherenkovLayer,50,5000,0.0381864,49.986,50.1245,0.507249,1.01198,0.0101198

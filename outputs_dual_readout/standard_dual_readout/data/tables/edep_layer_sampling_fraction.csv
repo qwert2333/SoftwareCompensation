@@ -1,0 +1,5 @@
+structure,particle,component,branch,sampling_fraction_type,slope_MeV_per_GeV,slope_err_MeV_per_GeV,sampling_fraction,sampling_fraction_err,chi2,ndf,fit_model
+data,e-,scintillation_layer,EdepScintLayer,EM,91.2169,0.00998592,0.0912169,9.98592e-06,3.04207,5,"mean_Edep_MeV=slope*Ebeam_GeV"
+data,e-,cherenkov_layer,EdepCherenkovLayer,EM,291.725,0.0213939,0.291725,2.13939e-05,7.23146,5,"mean_Edep_MeV=slope*Ebeam_GeV"
+data,pi-,scintillation_layer,EdepScintLayer,hadronic_effective,83.2793,0.0883341,0.0832793,8.83341e-05,853.865,5,"mean_Edep_MeV=slope*Ebeam_GeV"
+data,pi-,cherenkov_layer,EdepCherenkovLayer,hadronic_effective,242.122,0.253238,0.242122,0.000253238,216.064,5,"mean_Edep_MeV=slope*Ebeam_GeV"

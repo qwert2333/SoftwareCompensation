@@ -1,0 +1,10 @@
+parameter,value,fit_error_approx,strategy,role
+p10,4.999999999999997,0.9459404136484663,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p11,-1.3889643303215075e-16,0.14927757162536248,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p12,2.710156863421636e-18,0.004057250137604854,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p20,-1.857803237149594,0.25724001391288087,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p21,0.058407564268829815,0.03650316434378576,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p22,-0.0012147433782019887,0.0009490557420192334,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p30,0.6813609428594445,5.215318991869871,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p31,1.0000000000004358e-05,7.681190235051617,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV
+p32,-0.0048387446267711244,0.041123738417757814,two_stage_fit_to_per_energy_p_i,primary; used for E_LSC_GeV

@@ -1,0 +1,4 @@
+channel,a_percent_sqrtGeV,a_err,b_percent,b_err,chi2,ndf,function
+S,27.1372,0.44586,9.09202,0.0804615,50.2605,4,"resolution_percent(E_GeV)=sqrt((27.1372)^2/E_GeV+(9.09202)^2)"
+C,67.0287,0.821804,15.67,0.178045,5.43055,4,"resolution_percent(E_GeV)=sqrt((67.0287)^2/E_GeV+(15.67)^2)"
+DR,34.0425,0.394711,7.12842,0.0906885,87.667,4,"resolution_percent(E_GeV)=sqrt((34.0425)^2/E_GeV+(7.12842)^2)"

@@ -1,0 +1,7 @@
+energy_GeV,source_file,source_entries,exported_entries,calibration_entries,application_entries,empty_cell_events,events_with_offlayer_S_signal,offlayer_S_count_ignored,max_abs_scalar_vector_count_delta,status
+5,data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_5GeV.root,5000,5000,2464,2536,0,0,0,0,pass
+10,data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_10GeV.root,5000,5000,2487,2513,0,0,0,0,pass
+20,data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_20GeV.root,5000,5000,2491,2509,0,0,0,0,pass
+30,data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_30GeV.root,5000,5000,2502,2498,0,0,0,0,pass
+40,data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_40GeV.root,5000,5000,2556,2444,0,0,0,0,pass
+50,data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_50GeV.root,5000,5000,2509,2491,0,0,0,0,pass

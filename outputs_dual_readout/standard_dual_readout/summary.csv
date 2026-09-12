@@ -1,0 +1,2 @@
+structure,scint_MeV_per_readout,cherenkov_MeV_per_readout,h_over_e_S_intercept,h_over_e_S_slope,h_over_e_C_intercept,h_over_e_C_slope
+data,0.0946402,0.0381864,0.693453,-0.00149546,0.352674,-0.000731648

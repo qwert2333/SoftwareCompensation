@@ -1,0 +1,3 @@
+channel,intercept,intercept_err,slope_per_GeV,slope_err_per_GeV,chi2,ndf,function
+S,0.693453,0.00147271,-0.00149546,4.6473e-05,48.6512,4,"h_over_e(E_GeV)=0.693453+(-0.00149546)*E_GeV"
+C,0.352674,0.00109401,-0.000731648,3.26361e-05,37.0274,4,"h_over_e(E_GeV)=0.352674+(-0.000731648)*E_GeV"

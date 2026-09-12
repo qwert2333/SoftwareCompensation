@@ -1,0 +1,6 @@
+channel,a_percent_sqrtGeV,a_err,b_percent,b_err,chi2,ndf,function
+DR_ref,3.83352e-05,2.6014,20.046,0.081976,202.737,4,"resolution_percent(E_GeV)=sqrt((3.83352e-05)^2/E_GeV+(20.046)^2)"
+sigmaS_over_abs1minuschi,3.39005e-05,1.44945,31.6665,0.130618,1224.6,4,"resolution_percent(E_GeV)=sqrt((3.39005e-05)^2/E_GeV+(31.6665)^2)"
+abschi_sigmaC_over_abs1minuschi,0.000422874,0.943661,17.1533,0.0704829,772.612,4,"resolution_percent(E_GeV)=sqrt((0.000422874)^2/E_GeV+(17.1533)^2)"
+covariance_cancellation,-0.000195999,1.1436,29.3752,0.121951,1978.05,4,"resolution_percent(E_GeV)=sqrt((-0.000195999)^2/E_GeV+(29.3752)^2)"
+DR_measured,34.0425,0.394711,7.12842,0.0906885,87.667,4,"resolution_percent(E_GeV)=sqrt((34.0425)^2/E_GeV+(7.12842)^2)"

@@ -1,0 +1,7 @@
+energy_GeV,entries,fEM_mean,fEM_RMS,definition
+5,5000,0.295569,0.204532,truthEdepEM/(1000*Ebeam_GeV)
+10,5000,0.398284,0.200584,truthEdepEM/(1000*Ebeam_GeV)
+20,5000,0.431019,0.184155,truthEdepEM/(1000*Ebeam_GeV)
+30,5000,0.460066,0.177443,truthEdepEM/(1000*Ebeam_GeV)
+40,5000,0.468843,0.173117,truthEdepEM/(1000*Ebeam_GeV)
+50,5000,0.482996,0.172892,truthEdepEM/(1000*Ebeam_GeV)

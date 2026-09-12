@@ -1,0 +1,44 @@
+{
+  "method": "CALICE cell-level local software compensation",
+  "reference": "https://arxiv.org/abs/1705.10363",
+  "geometry": "Sapphire_5-5-5mm_N30x30x100",
+  "input_dir": "/Users/fangyi/WorkingArea/SoftwareCompensation/data",
+  "calibration_table": "/Users/fangyi/WorkingArea/SoftwareCompensation/outputs_dual_readout/standard_dual_readout/data/tables/electron_em_calibration.csv",
+  "S_GeV_per_count": 9.464019999999999e-05,
+  "cell_dimensions_mm": [
+    30.0,
+    30.0,
+    15.0
+  ],
+  "cell_volume_cm3": 13.5,
+  "density_definition": "rho = hit_energy_GeV / (cell_volume_cm3 / 1000)",
+  "n_density_bins": 10,
+  "binning": "calibration-only weighted quantiles; weight=hit_energy/Ebeam",
+  "split_seed": 170510363,
+  "split_definition": "stable hash; 0=calibration, 1=application",
+  "max_events_per_energy": -1,
+  "application_inputs": [
+    "aggregated vecNScint per CellID",
+    "unweighted S_EM_GeV"
+  ],
+  "excluded_inputs": [
+    "vecEdep",
+    "vecNChren",
+    "truthFem",
+    "beam energy"
+  ],
+  "weight_formula": "omega(rho,E)=p1(E)*exp(p2(E)*rho)+p3(E)",
+  "p1_formula": "p10+p11*E+p12*E^2",
+  "p2_formula": "p20+p21*E+p22*E^2",
+  "p3_formula": "p30/(p31+exp(p32*E))",
+  "loss": "sum_events ((Ebeam-E_LSC)/(0.5*sqrt(Ebeam)))^2 with equal energy-point weight",
+  "primary_fit_strategy": "per-energy three-parameter fits followed by two-stage p_i(E) fit",
+  "reference_fit_strategy": "direct global event-level nine-parameter fit",
+  "primary_output": "tables/reweighted_energy_metrics.csv",
+  "reference_output": "tables/direct_global_reference_energy_metrics.csv",
+  "primary_evaluation_split": "application",
+  "primary_resolution_definition": "sigma68/MPV following RunScintGlassSOnlyEdepScintLayer.cpp: sigma68 is half the narrowest interval containing round(0.68*N) events; MPV is the maximum-bin centre of an 80-bin histogram over [min-0.05*span,max+0.05*span]",
+  "primary_resolution_error": "(sigma68/MPV)/sqrt(2*N)",
+  "resolution_curve": "sqrt(a^2/E_GeV+b^2)",
+  "legacy_resolution_diagnostics": "gauss90_mean_GeV, gauss90_sigma_GeV, response_gauss90, resolution_gauss90 and RMS90/Mean90 are retained but are not primary"
+}

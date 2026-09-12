@@ -1,0 +1,3 @@
+strategy,success,status,message,cost_half_chi2_like,optimality,n_function_evaluations,n_calibration_events,n_application_events,chi2,ndf
+direct_global_event_fit,True,2,reference only; `ftol` termination condition is satisfied.,26449.23130996478,0.014641567588121279,62.0,15009,14991,,
+two_stage_p_i_fit,True,n/a,primary two-stage parameterization,13.763142182805868,,,15009,14991,27.526284365611737,9.0

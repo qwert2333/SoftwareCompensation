@@ -1,0 +1,38 @@
+{
+  "geometry_label": "Sapphire_5-5-5mm_N30x30x100",
+  "geometry": {
+    "nx": 30,
+    "ny": 30,
+    "nz": 100,
+    "crop_nx": 30,
+    "crop_ny": 30,
+    "crop_nz": 100
+  },
+  "crop_policy": "x=[0,30), y=[0,30), z=[0,100); this equals the full generated grid",
+  "electron_calibration": {
+    "S_GeV_per_count": 9.464019999999999e-05,
+    "C_GeV_per_count": 3.8186400000000004e-05,
+    "source_table": "/Users/fangyi/WorkingArea/SoftwareCompensation/outputs_dual_readout/standard_dual_readout/data/tables/electron_em_calibration.csv",
+    "fit": "through-origin fit of mean readout versus electron MC truth at 5,10,20,30,40,50 GeV"
+  },
+  "pion_h_over_e": {
+    "S_intercept": 0.693453,
+    "S_slope_per_GeV": -0.00149546,
+    "C_intercept": 0.352674,
+    "C_slope_per_GeV": -0.000731648,
+    "source_table": "/Users/fangyi/WorkingArea/SoftwareCompensation/outputs_dual_readout/standard_dual_readout/data/tables/pion_hovere_energy_fit.csv"
+  },
+  "standard_DR": {
+    "chi": "(1-h_over_e_S)/(1-h_over_e_C)",
+    "energy": "(S-chi*C)/(1-chi)",
+    "cnn_aux_policy": "six iterations; evaluate h/e at reconstructed energy only",
+    "truth_policy": "MC truth is target/diagnostic only and never enters CNN inputs"
+  },
+  "bias_policy": {
+    "characterization_sample": "/Users/fangyi/WorkingArea/SoftwareCompensation/data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_5-60GeV_Train.root",
+    "closure_sample": "/Users/fangyi/WorkingArea/SoftwareCompensation/data/DualReadoutTileCalo_Voxel30x30mm_ScintPlastic_Sapphire_AbsSTAINLESS-STEEL_5-5-5mm_N30x30x100_pi-_5-60GeV_Valid.root",
+    "table": "baseline_bias_by_energy_bin.csv",
+    "warning": "Do not derive corrections or normalization from the validation rows."
+  },
+  "cell_signal_scale_GeV_for_log1p_voxels": 0.001
+}
