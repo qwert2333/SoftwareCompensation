@@ -9,7 +9,11 @@ import numpy as np
 import torch
 
 from .device import select_device
-from .dr_model import DualReadoutHCALNet
+from .dr_model import (
+    DualReadoutHCALNet,
+    energy_from_scaled_residual,
+    residual_base_from_batch,
+)
 from .dr_train import make_loader
 from .dual_readout import AUX_NAMES, DualReadoutCalibration, DualReadoutGeometry
 
@@ -46,32 +50,47 @@ def energy_metrics(values, true_energy):
     }
 
 
-def evaluate_one(exp, files, out_dir, max_events_per_file=-1):
+def evaluate_one(exp, test_files, out_dir, max_events_per_file=-1):
     device = select_device(exp.get("device", "auto"))
     geo = DualReadoutGeometry(**exp["geometry"])
     calibration = DualReadoutCalibration(**exp["calibration"])
-    model = DualReadoutHCALNet(aux_dim=len(AUX_NAMES)).to(device)
+    model = DualReadoutHCALNet(
+        aux_dim=len(AUX_NAMES),
+        residual_scale=float(exp.get("residual_scale", 10.0)),
+    ).to(device)
     checkpoint = torch.load(
         os.path.join(out_dir, "checkpoints", "best.pth"), map_location=device
     )
     model.load_state_dict(checkpoint["model"])
     model.eval()
-    loader = make_loader(files, exp, "test", geo, calibration, device, max_events_per_file)
+    loader = make_loader(
+        test_files, exp, "test", geo, calibration, device, max_events_per_file
+    )
 
     columns = {name: [] for name in (
-        "event_id", "true_energy_GeV", "pred_energy_GeV",
+        "event_uid", "source_file", "entry_index", "event_id",
+        "true_energy_GeV", "pred_energy_GeV", "ml_residual_r", "ml_base_GeV",
         "S_crop_GeV", "C_crop_GeV", "E_DR_reco_crop_GeV",
     )}
     with torch.no_grad():
         for batch in loader:
-            prediction = model(
+            residual = model(
                 batch["voxel"].to(device, non_blocking=True),
                 batch["aux"].to(device, non_blocking=True),
-            ).cpu().numpy()
+            )
+            base = residual_base_from_batch(batch, exp["mode"], device=device)
+            prediction = energy_from_scaled_residual(
+                residual, base, eps=float(exp.get("base_eps", 0.7))
+            )
             values = {
+                "event_uid": np.asarray(batch["event_uid"], dtype=str),
+                "source_file": np.asarray(batch["source_file"], dtype=str),
+                "entry_index": batch["entry_index"].numpy(),
                 "event_id": batch["event_id"].numpy(),
                 "true_energy_GeV": batch["energy_true"].numpy(),
-                "pred_energy_GeV": prediction,
+                "pred_energy_GeV": prediction.cpu().numpy(),
+                "ml_residual_r": residual.cpu().numpy(),
+                "ml_base_GeV": base.cpu().numpy(),
                 "S_crop_GeV": batch["s_total"].numpy(),
                 "C_crop_GeV": batch["c_total"].numpy(),
                 "E_DR_reco_crop_GeV": batch["dr_reco"].numpy(),
@@ -81,7 +100,11 @@ def evaluate_one(exp, files, out_dir, max_events_per_file=-1):
     if not columns["event_id"]:
         raise RuntimeError("No test events were read")
     columns = {name: np.concatenate(parts) for name, parts in columns.items()}
-    order = np.lexsort((columns["event_id"], columns["true_energy_GeV"]))
+    if np.unique(columns["event_uid"]).size != columns["event_uid"].size:
+        raise RuntimeError("Duplicate event_uid values found in test predictions")
+    order = np.lexsort((
+        columns["event_id"], columns["entry_index"], columns["source_file"]
+    ))
     columns = {name: values[order] for name, values in columns.items()}
 
     prediction_path = os.path.join(out_dir, "test_predictions.csv")

@@ -1,0 +1,23 @@
+universe = vanilla
+initialdir = /eos/home-f/faguo/ML/SoftwareCompensation
+executable = condor/run_dual_readout_gpu.sh
+
+arguments = all /eos/user/f/faguo/DualReadoutTileCal/outputs_ML/condor/work /eos/home-f/faguo/ML/SoftwareCompensation/outputs_dual_readout/production/condor_$(ClusterId)
+
+request_cpus = 4
+request_memory = 24GB
+request_disk = 4GB
+request_gpus = 1
++JobFlavour = "testmatch"
+
+should_transfer_files = NO
+getenv = False
+
+output = logs/dual_readout_gpu.$(ClusterId).$(ProcId).out
+error = logs/dual_readout_gpu.$(ClusterId).$(ProcId).err
+log = logs/dual_readout_gpu.$(ClusterId).log
+
+notification = Error
+on_exit_hold = (ExitBySignal == True) || (ExitCode != 0)
+
+queue 1

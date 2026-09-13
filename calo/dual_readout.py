@@ -261,19 +261,7 @@ def build_event_input(cell_ids, n_scint, n_cherenkov, mode, geo, calibration,
     return stacked, aux, diagnostics
 
 
-def split_name(event_id, energy_gev, seed, train_fraction=0.70, val_fraction=0.15):
-    """Stable energy-stratified event split shared by both ablations."""
-    value = (
-        int(event_id) * 0x9E3779B1
-        + int(round(float(energy_gev) * 1000.0)) * 0x85EBCA6B
-        + int(seed)
-    ) & 0xFFFFFFFF
-    value ^= value >> 16
-    value = (value * 0x7FEB352D) & 0xFFFFFFFF
-    value ^= value >> 15
-    u = value / float(2**32)
-    if u < train_fraction:
-        return "train"
-    if u < train_fraction + val_fraction:
-        return "val"
-    return "test"
+def event_uid(source_file, entry_index, event_id):
+    """Return a stable event key when ROOT eventID values are sample-local."""
+    source_name = Path(source_file).name
+    return f"{source_name}#{int(entry_index)}:{int(event_id)}"

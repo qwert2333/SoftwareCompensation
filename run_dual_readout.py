@@ -17,6 +17,9 @@ from calo.dual_readout import AUX_NAMES, load_baseline_profile
 from calo.seed import set_global_seed
 
 
+REQUIRED_TEST_ENERGIES_GEV = {5, 10, 20, 30, 40, 50}
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", required=True)
@@ -35,23 +38,45 @@ def parse_args():
     return parser.parse_args()
 
 
+def discover_file_roles(input_dir):
+    train_files = sorted(glob.glob(os.path.join(
+        input_dir, "*_pi-_5-60GeV_Train.root"
+    )))
+    validation_files = sorted(glob.glob(os.path.join(
+        input_dir, "*_pi-_5-60GeV_Valid.root"
+    )))
+    if not train_files:
+        raise RuntimeError(f"No *_pi-_5-60GeV_Train.root files found in {input_dir}")
+    if not validation_files:
+        raise RuntimeError(f"No *_pi-_5-60GeV_Valid.root files found in {input_dir}")
+
+    test_by_energy = {}
+    for path in sorted(glob.glob(os.path.join(input_dir, "*_pi-_*.root"))):
+        match = re.search(r"_pi-_([0-9]+)GeV\.root$", os.path.basename(path))
+        if not match:
+            continue
+        energy = int(match.group(1))
+        if energy in test_by_energy:
+            raise RuntimeError(
+                f"Multiple fixed-energy pion files found at {energy} GeV"
+            )
+        test_by_energy[energy] = path
+    missing = sorted(REQUIRED_TEST_ENERGIES_GEV - set(test_by_energy))
+    if missing:
+        raise RuntimeError(f"Missing required fixed-energy pion samples: {missing}")
+    return train_files, validation_files, [
+        test_by_energy[energy] for energy in sorted(test_by_energy)
+    ]
+
+
 def main():
     args = parse_args()
-    files = sorted(glob.glob(os.path.join(args.input_dir, "*_pi-_*.root")))
-    if not files:
-        raise RuntimeError(f"No pion ROOT files found in {args.input_dir}")
+    train_files, validation_files, test_files = discover_file_roles(args.input_dir)
     profile = load_baseline_profile(args.input_dir, args.reference_dir)
-    expected_energies = {5, 10, 20, 30, 40, 50}
-    found_energies = set()
-    for path in files:
-        name = os.path.basename(path)
-        match = re.search(r"_pi-_([0-9]+)GeV\.root$", name)
-        if match:
-            found_energies.add(int(match.group(1)))
-    if found_energies != expected_energies:
-        raise RuntimeError(
-            f"Expected pion energies {sorted(expected_energies)}, got {sorted(found_energies)}"
-        )
+    test_energies = [
+        int(re.search(r"_pi-_([0-9]+)GeV\.root$", os.path.basename(path)).group(1))
+        for path in test_files
+    ]
     selected = EXPERIMENTS if args.experiment == "all" else [
         exp for exp in EXPERIMENTS if exp["mode"] == args.experiment
     ]
@@ -68,26 +93,48 @@ def main():
         exp["device"] = args.device
         exp["geometry"] = asdict(profile.geometry)
         exp["calibration"] = asdict(profile.calibration)
+        exp["data_manifest"] = {
+            "train": train_files,
+            "validation": validation_files,
+            "test": test_files,
+        }
         set_global_seed(seed)
         baseline_output = os.path.join(args.output_dir, profile.name)
         out_dir = os.path.join(baseline_output, exp["name"])
         os.makedirs(out_dir, exist_ok=True)
+        x0, x1, y0, y1, z0, z1 = profile.geometry.crop_bounds
         config = {
             **exp,
             "seed": seed,
-            "input_files": files,
+            "train_files": train_files,
+            "validation_files": validation_files,
+            "test_files": test_files,
+            "test_energies_GeV": test_energies,
             "baseline": profile.name,
             "aux_names": AUX_NAMES,
             "calibration_table": profile.calibration_table,
             "hovere_fit_table": profile.hovere_fit_table,
-            "crop_policy": "x,y central [15,45); z front [0,100); all outside cells discarded",
+            "crop_policy": (
+                f"x=[{x0},{x1}), y=[{y0},{y1}), z=[{z0},{z1}); "
+                "all outside cells discarded"
+            ),
+            "event_identity_policy": "source filename + ROOT entry index + original eventID",
+            "data_role_policy": (
+                "*_5-60GeV_Train.root=train; *_5-60GeV_Valid.root=validation; "
+                "fixed-energy pion files=test only"
+            ),
             "truth_policy": "MCtruth_energy is target only; no truth or filename energy enters features",
             "standard_dr_policy": "h/e and chi evaluated self-consistently from reconstructed crop S/C",
         }
         with open(os.path.join(out_dir, "run_config.json"), "w") as handle:
             json.dump(config, handle, indent=2)
-        train_one(exp, files, out_dir, seed, args.max_events_per_file)
-        all_metrics.extend(evaluate_one(exp, files, out_dir, args.max_events_per_file))
+        train_one(
+            exp, train_files, validation_files, out_dir, seed,
+            args.max_events_per_file,
+        )
+        all_metrics.extend(
+            evaluate_one(exp, test_files, out_dir, args.max_events_per_file)
+        )
 
     if len(selected) == 2:
         combined_path = os.path.join(baseline_output, "comparison_metrics.csv")

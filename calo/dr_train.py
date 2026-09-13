@@ -10,16 +10,20 @@ import torch
 from torch.utils.data import DataLoader
 
 from .dr_dataset import DualReadoutIterable
-from .dr_model import DualReadoutHCALNet
+from .dr_model import (
+    DualReadoutHCALNet,
+    energy_from_scaled_residual,
+    residual_base_from_batch,
+)
 from .device import select_device
 from .dual_readout import AUX_NAMES, DualReadoutCalibration, DualReadoutGeometry
 from .losses import compute_loss
 
 
-def make_loader(files, exp, split, geo, calibration, device, max_events_per_file=-1):
+def make_loader(files, exp, role, geo, calibration, device, max_events_per_file=-1):
     dataset = DualReadoutIterable(
-        files, exp["mode"], split, geo, calibration, exp["split_seed"],
-        shuffle=(split == "train"),
+        files, exp["mode"], geo, calibration, exp["data_order_seed"],
+        shuffle=(role == "train"),
         max_events_per_file=max_events_per_file,
         cell_signal_scale_gev=exp["cell_signal_scale_gev"],
     )
@@ -52,11 +56,15 @@ def run_epoch(model, loader, optimizer, scaler, device, exp, training):
                 if device.type == "cuda" else nullcontext()
             )
             with amp_context:
-                prediction = model(voxel, aux)
+                residual = model(voxel, aux)
+                base = residual_base_from_batch(batch, exp["mode"], device=device)
+                prediction = energy_from_scaled_residual(
+                    residual, base, eps=float(exp.get("base_eps", 0.7))
+                )
                 loss = compute_loss(
                     prediction, target,
                     denom_min=float(exp.get("denom_min", 0.7)),
-                    loss_name=exp.get("loss_name", "l1_relative"),
+                    loss_name=exp.get("loss_name", "relative_mse"),
                 )
             if training:
                 scaler.scale(loss).backward()
@@ -74,7 +82,7 @@ def _plot(log, out_dir):
     fig, axis = plt.subplots(figsize=(6, 4.5))
     axis.plot(log["train"], label="train")
     axis.plot(log["val"], label="validation")
-    axis.set(xlabel="Epoch", ylabel="Relative L1")
+    axis.set(xlabel="Epoch", ylabel="Loss")
     axis.grid(alpha=0.3)
     axis.legend()
     fig.tight_layout()
@@ -82,16 +90,25 @@ def _plot(log, out_dir):
     plt.close(fig)
 
 
-def train_one(exp, files, out_dir, seed, max_events_per_file=-1):
+def train_one(exp, train_files, validation_files, out_dir, seed,
+              max_events_per_file=-1):
     device = select_device(exp.get("device", "auto"))
     print(f"Compute device: {device}", flush=True)
     geo = DualReadoutGeometry(**exp["geometry"])
     calibration = DualReadoutCalibration(**exp["calibration"])
-    model = DualReadoutHCALNet(aux_dim=len(AUX_NAMES)).to(device)
+    model = DualReadoutHCALNet(
+        aux_dim=len(AUX_NAMES),
+        residual_scale=float(exp.get("residual_scale", 10.0)),
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=float(exp.get("lr", 1.0e-3)))
     scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda"))
-    train_loader = make_loader(files, exp, "train", geo, calibration, device, max_events_per_file)
-    val_loader = make_loader(files, exp, "val", geo, calibration, device, max_events_per_file)
+    train_loader = make_loader(
+        train_files, exp, "train", geo, calibration, device, max_events_per_file
+    )
+    val_loader = make_loader(
+        validation_files, exp, "validation", geo, calibration, device,
+        max_events_per_file,
+    )
 
     checkpoint_dir = os.path.join(out_dir, "checkpoints")
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -102,6 +119,19 @@ def train_one(exp, files, out_dir, seed, max_events_per_file=-1):
     log = {"train": [], "val": []}
     if os.path.exists(last_path):
         checkpoint = torch.load(last_path, map_location=device)
+        checkpoint_exp = checkpoint.get("exp", {})
+        checkpoint_identity = checkpoint_exp.get("event_identity_version")
+        expected_identity = exp.get("event_identity_version")
+        checkpoint_manifest = checkpoint_exp.get("data_manifest")
+        expected_manifest = exp.get("data_manifest")
+        if (
+            checkpoint_identity != expected_identity
+            or checkpoint_manifest != expected_manifest
+        ):
+            raise RuntimeError(
+                "Checkpoint data protocol or file manifest is incompatible "
+                "with this run. Use a new output directory."
+            )
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         if checkpoint.get("scaler") is not None:

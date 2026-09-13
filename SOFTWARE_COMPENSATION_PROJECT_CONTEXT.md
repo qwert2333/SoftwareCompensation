@@ -223,7 +223,7 @@ The implemented equations are:
 E_\mathrm{DR}=\frac{S-\chi C}{1-\chi}.
 \]
 
-The code starts from reconstructed cropped S and iterates the energy-dependent `h/e` lines and `E_DR` to self-consistency. Truth energy and filename energy are not used as input features. `MCtruth_energy` is used only as the regression target and for deterministic energy-stratified splitting.
+The code starts from reconstructed cropped S and iterates the energy-dependent `h/e` lines and `E_DR` to self-consistency. Truth energy and filename energy are not used as input features. `MCtruth_energy` is used only as the regression target.
 
 Calibration constants are loaded from external tables and recorded in each `run_config.json`; the sample name and constants are not hardcoded in the training entry point.
 
@@ -251,13 +251,18 @@ optimizer        = Adam
 loss             = relative L1
 denom_min        = 0.7 GeV
 num_workers      = 2
-train/val/test   = 70% / 15% / 15%
-split_seed       = 170510363
+train            = explicit *_5-60GeV_Train.root files
+validation       = explicit *_5-60GeV_Valid.root files
+test             = fixed-energy pion ROOT files only
+data order seed  = 170510363
 global seed      = 20260908
 voxel transform  = log1p(signal_GeV / 1e-3 GeV)
 ```
 
-The split is deterministic in `(eventID, true energy, seed)` and shared between `s_only` and `sc_full`.
+The generated ROOT files reuse sample-local `eventID` values. Event identity is
+therefore the tuple `(source filename, ROOT entry index, eventID)`. File roles
+are explicit rather than derived from an event hash. Prediction files retain
+all identity components and reject duplicate composite IDs.
 
 Device selection priority for `--device auto` is:
 

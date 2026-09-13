@@ -1,18 +1,27 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pandas as pd
 import torch
 
 from calo.device import select_device
+from calo.dr_model import (
+    DualReadoutHCALNet,
+    energy_from_scaled_residual,
+    residual_base_from_batch,
+)
 from calo.dr_performance import fit_resolution_curves
+from calo.losses import compute_loss
 from calo.dual_readout import (
     CHANNEL_BASE,
     DualReadoutCalibration,
     DualReadoutGeometry,
     build_event_input,
-    split_name,
+    event_uid,
 )
+from run_dual_readout import discover_file_roles
 
 
 def encoded_cell(channel, ix, iy, iz, base=1000):
@@ -67,13 +76,65 @@ class DualReadoutInputTest(unittest.TestCase):
         self.assertEqual(diagnostics["C_total_GeV"], 0.0)
         self.assertEqual(diagnostics["E_DR_reco_GeV"], 0.0)
 
-    def test_split_is_deterministic(self):
-        first = split_name(123, 30.0, 170510363)
-        self.assertEqual(first, split_name(123, 30.0, 170510363))
-        self.assertIn(first, {"train", "val", "test"})
+    def test_event_uid_disambiguates_repeated_root_event_ids(self):
+        first = event_uid("sample.root", 123, 17)
+        self.assertEqual(first, event_uid("/different/path/sample.root", 123, 17))
+        self.assertNotEqual(first, event_uid("sample.root", 5123, 17))
+        self.assertNotEqual(first, event_uid("other.root", 123, 17))
+
+    def test_explicit_file_roles(self):
+        prefix = "Detector_N30x30x100_pi-_"
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            train = root / f"{prefix}5-60GeV_Train.root"
+            validation = root / f"{prefix}5-60GeV_Valid.root"
+            train.touch()
+            validation.touch()
+            for energy in (5, 10, 15, 20, 25, 30, 40, 50):
+                (root / f"{prefix}{energy}GeV.root").touch()
+
+            train_files, validation_files, test_files = discover_file_roles(root)
+
+        self.assertEqual(train_files, [str(train)])
+        self.assertEqual(validation_files, [str(validation)])
+        self.assertEqual(len(test_files), 8)
+        self.assertFalse(any("Train" in path or "Valid" in path for path in test_files))
 
     def test_explicit_cpu_device(self):
         self.assertEqual(select_device("cpu"), torch.device("cpu"))
+
+    def test_scaled_residual_uses_expected_energy_base(self):
+        batch = {
+            "s_total": torch.tensor([4.0, 9.0]),
+            "dr_reco": torch.tensor([5.0, 10.0]),
+        }
+        self.assertTrue(torch.equal(
+            residual_base_from_batch(batch, "s_only"), batch["s_total"]
+        ))
+        self.assertTrue(torch.equal(
+            residual_base_from_batch(batch, "sc_full"), batch["dr_reco"]
+        ))
+
+    def test_scaled_residual_prediction_formula(self):
+        residual = torch.tensor([1.0, -2.0])
+        base = torch.tensor([4.0, 0.1])
+        prediction = energy_from_scaled_residual(residual, base, eps=0.25)
+        expected = torch.tensor([6.0, -0.9])
+        self.assertTrue(torch.allclose(prediction, expected))
+
+    def test_residual_model_initializes_to_no_correction(self):
+        model = DualReadoutHCALNet(residual_scale=10.0)
+        voxel = torch.randn(3, 2, 8, 12, 8)
+        aux = torch.randn(3, 11)
+        residual = model(voxel, aux)
+        self.assertTrue(torch.allclose(residual, torch.zeros_like(residual)))
+
+    def test_relative_mse_matches_report_loss(self):
+        pred = torch.tensor([11.0, 18.0])
+        target = torch.tensor([10.0, 20.0])
+        loss = compute_loss(pred, target, denom_min=0.7, loss_name="relative_mse")
+        expected = 0.5 * torch.mean(torch.tensor([0.1, -0.1]).pow(2))
+        self.assertAlmostEqual(float(loss), float(expected), places=7)
 
 
 class DualReadoutPerformanceTest(unittest.TestCase):

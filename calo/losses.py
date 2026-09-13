@@ -35,7 +35,7 @@ def sigma_from_target(target, cfg=None):
 
 def compute_loss(pred, target, weight_cfg=None, denom_min=1.0,
                  loss_name="smooth_l1_relative", sigma_cfg=None):
-    if loss_name in {"smooth_l1_relative", "l1_relative"}:
+    if loss_name in {"smooth_l1_relative", "l1_relative", "relative_mse"}:
         resid = relative_residual(pred, target, denom_min=denom_min)
     elif loss_name in {"smooth_l1_standardized", "l1_standardized"}:
         resid = (pred - target) / sigma_from_target(target, sigma_cfg)
@@ -44,6 +44,8 @@ def compute_loss(pred, target, weight_cfg=None, denom_min=1.0,
 
     if loss_name.startswith("smooth_l1"):
         base = F.smooth_l1_loss(resid, torch.zeros_like(resid), reduction="none")
+    elif loss_name == "relative_mse":
+        base = 0.5 * resid.pow(2)
     else:
         base = torch.abs(resid)
     if weight_cfg:

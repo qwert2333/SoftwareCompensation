@@ -1,14 +1,19 @@
 """Controlled first dual-readout comparison."""
 
 COMMON = dict(
-    loss_name="l1_relative",
+    loss_name="relative_mse",
     denom_min=0.7,
+    model_output="scaled_residual",
+    model_version="groupnorm-residual-v1",
+    base_eps=0.7,
+    residual_scale=10.0,
     epochs=40,
     lr=1.0e-3,
     batch_size=8,
     num_workers=2,
     device="auto",
-    split_seed=170510363,
+    data_order_seed=170510363,
+    event_identity_version="explicit-file-roles-v3-groupnorm-scaled-residual",
     cell_signal_scale_gev=1.0e-3,
 )
 
