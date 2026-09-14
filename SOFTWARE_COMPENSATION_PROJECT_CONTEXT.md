@@ -1,6 +1,6 @@
 # Software Compensation Project Context
 
-> Updated: 2026-09-12
+> Updated: 2026-09-14
 > Purpose: handoff reference for another agent working on the dual-readout tile-HCAL software-compensation study.
 > Canonical code checkout: `/Users/fangyi/WorkingArea/SoftwareCompensation`
 
@@ -41,6 +41,7 @@ Relevant commits, newest last:
 - `2de087a` — dynamic Sapphire baseline configuration
 - `21f5522` — per-epoch training progress output
 - `a972efa` — performance validation and resolution-fit scripts
+- `ab61ce4` — residual dual-readout CNN workflow, HTCondor submission, and compact diagnostic summaries
 
 ### Artifact policy
 
@@ -156,32 +157,46 @@ voxel sums refer to the same geometrical acceptance.
 
 ### Voxel encoder
 
-- Input channels: S and C.
-- First convolution downsamples only the two transverse axes with stride `(2, 1, 2)`.
-- The full 100-bin longitudinal direction reaches the downstream branches.
-- Three initial 3D convolutions produce a 32-channel encoded volume.
+- Input channels: S and C in a single early-fusion tensor; there is deliberately no S/C dual-branch split.
+- The trunk uses shallow residual 3D blocks with `GroupNorm` and `SiLU` activations, chosen to be more stable than BatchNorm for the current small batch size.
+- Only the two transverse axes are downsampled with stride `(2, 1, 2)`; the full 100-bin longitudinal direction reaches the downstream branches.
+- The encoded volume has 64 channels after the current GroupNorm residual trunk.
 
 ### Global branch
 
-- Additional 3D convolution: 32 to 64 channels.
+- Additional normalized 3D convolution at 64 channels.
 - Adaptive global average pooling.
 - Produces a 64-dimensional event representation.
 
 ### Longitudinal shower-profile branch
 
 - The encoded volume is averaged over both transverse axes.
-- The resulting learned longitudinal feature sequence is processed by two 1D convolutions and global pooling.
+- The resulting learned longitudinal feature sequence is processed by two normalized 1D convolutions and global pooling.
 - It produces a 64-dimensional vector.
 
 This branch is manually specified as an architectural prior: the developer explicitly chooses to preserve and summarize longitudinal development. Its convolution weights and extracted representation are learned from data. It is therefore neither a fully hand-calculated shower variable nor a structure discovered automatically by an unconstrained network.
 
-### Auxiliary branch and fusion
+### Auxiliary branch, fusion and residual output
 
 - Eleven scalar inputs are mapped to 32 learned features.
 - Global, longitudinal and auxiliary features are concatenated.
-- A small MLP outputs one scalar reconstructed energy.
+- The final MLP outputs a bounded scaled residual `r = residual_scale * tanh(raw_r)`.
+- The final linear layer is zero-initialized, so a new model starts from no correction: `r = 0` and `E_pred = E_base`.
 
-The current network predicts absolute energy directly. It does not yet predict a residual relative to raw S or standard dual readout.
+The reconstructed energy is now:
+
+```text
+E_pred = E_base + sqrt(max(E_base, base_eps)) * r
+```
+
+The baseline energy is selected by mode:
+
+```text
+s_only  -> calibrated cropped S total
+sc_full -> self-consistent cropped standard dual-readout energy E_DR
+```
+
+This parameterization is intended to let the CNN learn a stochastic-scale correction on top of a physically meaningful baseline rather than freely regressing absolute energy from scratch.
 
 ## 7. Auxiliary features
 
@@ -248,8 +263,11 @@ epochs          = 40
 batch_size       = 8
 learning_rate    = 1e-3
 optimizer        = Adam
-loss             = relative L1
+loss             = report-style relative MSE, 0.5 * ((E_pred - E_true) / max(E_true, 0.7 GeV))^2
 denom_min        = 0.7 GeV
+model output     = bounded scaled residual
+base_eps         = 0.7 GeV
+residual_scale   = 10.0
 num_workers      = 2
 train            = explicit *_5-60GeV_Train.root files
 validation       = explicit *_5-60GeV_Valid.root files
@@ -274,7 +292,7 @@ Explicit `--device mps` fails if MPS is unavailable instead of silently falling 
 
 Training resumes automatically from `checkpoints/last.pth`. Every epoch is saved as `epoch_NNN.pth`; `best.pth` and `last.pth` are also maintained. Each epoch prints train/validation loss, event counts, best validation loss, learning rate, device, elapsed time and checkpoint name.
 
-The completed runs used MPS.
+The earlier local runs used MPS. The HTCondor production run in Section 14 used CUDA on a Tesla V100 GPU.
 
 ## 10. Historical training and validation results
 
@@ -378,18 +396,14 @@ There are 5,000 events at each of:
 
 ### Integration status
 
-The fixed calibration samples are now integrated into the standard
-dual-readout and local-SC workflows. The main CNN training runner is not yet
-integrated with the explicit continuous Train/Valid roles. Passing all of
-`data/` directly to the old runner remains incorrect because:
+The fixed calibration samples are integrated into the standard dual-readout and local-SC workflows. The CNN runner is also integrated with explicit file roles:
 
-- 15 and 25 GeV pion files violate the hard expected-energy set;
-- the continuous Train/Valid names are not handled as explicit split files;
-- the default calibration-table path must be overridden with the new output in
-  Section 12;
-- the current dataset applies its own hash split instead of respecting the pre-generated Train/Valid roles.
+- `*_pi-_5-60GeV_Train.root` is used only for training;
+- `*_pi-_5-60GeV_Valid.root` is used only for validation/checkpoint selection;
+- fixed-energy pion files are used only for test evaluation;
+- 15 and 25 GeV pion files are accepted as fixed-energy evaluation points and are not absorbed into calibration fits.
 
-The next code change should introduce an explicit data manifest or separate `--train-files`, `--val-files`, and `--test-files` arguments rather than extending filename guessing.
+Each run records its data manifest, event identity protocol and calibration provenance in `run_config.json`. Prediction files retain `(source_file, entry_index, eventID)` so repeated sample-local `eventID` values cannot collide.
 
 ## 12. New-production baseline workflow and calibration
 
@@ -539,31 +553,86 @@ These whole-range residual numbers mix the 5--60 GeV spectrum and are not
 single-energy calorimeter resolutions. Never derive normalization or a bias
 correction from the rows labelled `continuous_valid_closure`.
 
-## 14. Recommended next implementation steps
+## 14. 2026-09-13 HTCondor residual-CNN production
+
+The newest production run is:
+
+```text
+outputs_dual_readout/production/condor_321958
+```
+
+It was submitted on 2026-09-13 at 11:45 CERN time and ran commit:
+
+```text
+ab61ce42b684f07308d0b1992e524dba192cb37e
+```
+
+The job used the residual-output GroupNorm CNN described in Section 6 and the report-style relative-MSE loss described in Section 9. It ran both `s_only` and `sc_full` on CUDA using a Tesla V100-PCIE-32GB and completed normally on 2026-09-13 at 23:01 CERN time. The Condor return value was 0 and stderr was empty.
+
+Training losses are not directly comparable to the older `condor_317536` run because the loss changed from relative L1 to relative MSE. Within the new run, validation behavior is substantially more stable than the old direct-energy model:
+
+| Experiment | Best epoch | Best validation loss | Final train loss | Final validation loss |
+|---|---:|---:|---:|---:|
+| `dr_j1_s_only` | 38 | 0.007363 | 0.006480 | 0.007806 |
+| `dr_j1_sc_full` | 35 | 0.007079 | 0.006741 | 0.007354 |
+
+### Per-energy CNN results for `condor_321958`
+
+Resolution remains defined as `sigma68 / MPV`.
+
+| Energy [GeV] | S-only CNN | S+C CNN | Relative S+C improvement | S-only mean bias | S+C mean bias |
+|---:|---:|---:|---:|---:|---:|
+| 5  | 7.11% | 7.93% | -11.42% | 5.17% | 4.70% |
+| 10 | 6.74% | 7.04% | -4.44% | 0.17% | -0.46% |
+| 15 | 6.15% | 6.17% | -0.34% | -0.70% | -0.87% |
+| 20 | 5.72% | 5.69% | 0.46% | -1.64% | -1.95% |
+| 25 | 5.67% | 5.54% | 2.27% | -1.71% | -2.23% |
+| 30 | 5.33% | 5.24% | 1.65% | -1.87% | -2.63% |
+| 40 | 4.98% | 4.90% | 1.59% | -2.86% | -3.49% |
+| 50 | 4.40% | 4.27% | 3.01% | -4.57% | -5.08% |
+
+Compared with the older direct-energy `condor_317536` model, the residual CNN has a more physical resolution scaling but slightly worse average absolute resolution:
+
+| Version | Mode | Average resolution | Average absolute mean bias |
+|---|---|---:|---:|
+| `condor_317536` direct energy | `s_only` | 5.67% | 2.51% |
+| `condor_317536` direct energy | `sc_full` | 5.56% | 2.69% |
+| `condor_321958` residual | `s_only` | 5.76% | 2.34% |
+| `condor_321958` residual | `sc_full` | 5.85% | 2.68% |
+
+Weighted fits to `sqrt(a^2/E + b^2)` improved in shape relative to the old direct-energy fit, but are still not high-quality fits:
+
+| Version | Mode | `a` [% sqrt(GeV)] | `b` [%] | chi2/ndf |
+|---|---|---:|---:|---:|
+| `condor_317536` direct energy | `s_only` | 7.41 | 5.24 | 106.9 |
+| `condor_317536` direct energy | `sc_full` | 4.69 | 5.31 | 137.7 |
+| `condor_321958` residual | `s_only` | 14.05 | 4.51 | 59.2 |
+| `condor_321958` residual | `sc_full` | 16.84 | 4.05 | 41.0 |
+
+Against the same-geometry baselines, the new residual `sc_full` CNN remains much better in absolute resolution than standard dual readout and CALICE-style local SC:
+
+| Method | Average resolution | Average absolute mean bias |
+|---|---:|---:|
+| residual CNN `sc_full` | 5.85% | 2.68% |
+| standard dual readout | 11.25% | 3.70% |
+| CALICE local SC | 8.70% | 3.38% |
+
+Interpretation: the residual parameterization and GroupNorm residual trunk fixed part of the unphysical flat-resolution behavior and made the validation curve calmer, but the S+C model no longer clearly beats S-only at low energy. At 20--50 GeV it gives small positive gains over S-only; at 5--15 GeV it is slightly worse. The next tuning target is therefore not more architecture complexity, but low-energy response control, learning-rate scheduling or early stopping, and ablations of the DR auxiliary variables.
+
+## 15. Recommended next implementation steps
 
 Priority order:
 
-1. Add explicit train/validation/test file-role handling for the new ROOT files.
-2. Validate event-ID uniqueness across Train, Valid and all fixed-energy samples.
-3. Freeze and copy the Section 12 calibration into each new run configuration.
-4. Run schema, entry-count and small CPU/MPS smoke tests.
-5. Retrain `s_only` and `sc_full` on the same 60,000 continuous-energy pion training sample.
-6. Use the 10,000 continuous validation sample for checkpoint selection and early stopping.
-7. Evaluate only on independent fixed-energy pion samples; decide explicitly
-   whether 15 and 25 GeV are interpolation checks or ordinary test points.
-8. Compare the CNN against the new same-geometry raw-S, local-SC and standard-DR baselines in Section 13.
-9. Report response linearity and mean bias together with resolution.
-10. Fit `a` and `b` only after the resolution points show a physically plausible smooth energy dependence and fit quality is acceptable.
+1. Add learning-rate scheduling or early stopping to avoid training far past the best validation epoch.
+2. Tune low-energy behavior of the residual CNN, especially the 5--15 GeV region where `sc_full` is currently worse than `s_only`.
+3. Run controlled ablations for voxel information, global auxiliary information, standard-DR auxiliary variables and longitudinal branch contributions.
+4. Compare alternate residual scales and bounded/unbounded residual heads.
+5. Repeat final results over multiple random seeds.
+6. Report response linearity and mean bias together with resolution.
+7. Fit `a` and `b` only after the resolution points show a physically plausible smooth energy dependence and fit quality is acceptable.
+8. Estimate statistical uncertainties with bootstrap or toy resampling rather than relying only on `resolution/sqrt(2N)`.
 
-Recommended model-development improvements after establishing the corrected baseline:
-
-- enable early stopping or stronger regularization because both completed runs overfit;
-- consider learning a residual relative to raw S (`s_only`) or standard DR (`sc_full`) instead of absolute energy from scratch;
-- add controlled ablations for voxel information, global auxiliary information and longitudinal branch contributions;
-- repeat final results over multiple random seeds;
-- estimate statistical uncertainties with bootstrap or toy resampling rather than relying only on `resolution/sqrt(2N)`.
-
-## 15. Validation and safety rules for future agents
+## 16. Validation and safety rules for future agents
 
 - Do not interpret a tiny width around a generated discrete energy as genuine detector resolution.
 - Do not use truth energy or filename energy as an input feature.
@@ -577,30 +646,34 @@ Recommended model-development improvements after establishing the corrected base
 - Treat a smoke test as software validation only, not as physics validation.
 - Check the working tree before editing; preserve user data and unrelated changes.
 
-## 16. Current test status
+## 17. Current test status
 
 The `ml4hep` environment does not currently contain `pytest`, but the test suite is compatible with Python `unittest`.
 
 Verified command:
 
 ```bash
-conda run --no-capture-output -n ml4hep \
-  python -m unittest discover -s tests -v
+source /eos/home-f/faguo/ML/setup_env.sh
+cd /eos/home-f/faguo/ML/SoftwareCompensation
+python -m unittest tests.test_dual_readout
 ```
 
-Status on 2026-09-12: all five tests passed.
+Status on 2026-09-14: all ten tests passed in the `ml4hep` environment.
 
 The tests cover:
 
 - crop behavior and signal aggregation;
 - strict removal of C/DR information in `s_only`;
-- deterministic splitting;
+- explicit file-role discovery and composite event identity;
 - explicit CPU selection;
+- scaled-residual base selection and prediction formula;
+- report-style relative-MSE loss;
+- zero-initialized residual model output;
 - recovery of known synthetic stochastic/constant terms by the fitter.
 
 The Matplotlib cache may fall back to a temporary directory because the default user cache is not writable in a restricted agent environment; this warning did not cause a test failure.
 
-## 17. Suggested reading order
+## 18. Suggested reading order
 
 For a new agent, read in this order:
 
